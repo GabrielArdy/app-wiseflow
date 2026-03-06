@@ -5,3 +5,4 @@ dist/
 *.log
 .claude/
 CLAUDE.md
+*.sh

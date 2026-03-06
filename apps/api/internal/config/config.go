@@ -6,16 +6,18 @@ import (
 )
 
 type Config struct {
-	Port           string
-	DatabaseURL    string
-	RedisURL       string
-	JWTSecret      string
-	AccessTokenTTL int // minutes
+	Environment     string
+	Port            string
+	DatabaseURL     string
+	RedisURL        string
+	JWTSecret       string
+	AccessTokenTTL  int // minutes
 	RefreshTokenTTL int // days
 }
 
 func Load() (*Config, error) {
 	cfg := &Config{
+		Environment:     getEnv("ENVIRONMENT", "development"),
 		Port:            getEnv("PORT", "8080"),
 		DatabaseURL:     os.Getenv("DATABASE_URL"),
 		RedisURL:        getEnv("REDIS_URL", "redis://localhost:6379"),

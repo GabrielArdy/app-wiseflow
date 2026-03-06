@@ -2,8 +2,12 @@ package handler
 
 import (
 	"net/http"
+	"net/mail"
+	"time"
 
 	"github.com/labstack/echo/v4"
+	dbutil "github.com/wiseflow/api/internal/db"
+	"github.com/wiseflow/api/internal/db/sqlc"
 	appMiddleware "github.com/wiseflow/api/internal/middleware"
 	"github.com/wiseflow/api/internal/service"
 )
@@ -14,6 +18,23 @@ type AuthHandler struct {
 
 func NewAuthHandler(svc *service.AuthService) *AuthHandler {
 	return &AuthHandler{svc: svc}
+}
+
+// UserResponse is a DTO that prevents accidental password hash exposure
+type UserResponse struct {
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	FullName  string `json:"full_name"`
+	CreatedAt string `json:"created_at"`
+}
+
+func toUserResponse(u *sqlc.User) UserResponse {
+	return UserResponse{
+		ID:        dbutil.UUIDToString(u.ID),
+		Email:     u.Email,
+		FullName:  u.FullName,
+		CreatedAt: u.CreatedAt.Time.Format(time.RFC3339),
+	}
 }
 
 func (h *AuthHandler) Register(c echo.Context) error {
@@ -30,6 +51,14 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "email, password, and full_name are required")
 	}
 
+	if _, err := mail.ParseAddress(body.Email); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid email format")
+	}
+
+	if len(body.Password) < 8 {
+		return echo.NewHTTPError(http.StatusBadRequest, "password must be at least 8 characters")
+	}
+
 	user, err := h.svc.Register(c.Request().Context(), service.RegisterInput{
 		Email:    body.Email,
 		Password: body.Password,
@@ -40,12 +69,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusCreated, map[string]any{
-		"data": map[string]any{
-			"id":         user.ID,
-			"email":      user.Email,
-			"full_name":  user.FullName,
-			"created_at": user.CreatedAt,
-		},
+		"data": toUserResponse(user),
 	})
 }
 

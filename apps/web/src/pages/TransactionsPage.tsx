@@ -40,8 +40,10 @@ export default function TransactionsPage() {
   const grouped = useMemo(() => {
     const map = new Map<string, Transaction[]>()
     for (const tx of filtered) {
-      const existing = map.get(tx.date) ?? []
-      map.set(tx.date, [...existing, tx])
+      if (!map.has(tx.date)) {
+        map.set(tx.date, [])
+      }
+      map.get(tx.date)!.push(tx)
     }
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]))
   }, [filtered])
@@ -201,8 +203,11 @@ function AddTransactionSheet({
     setError(null)
     setLoading(true)
     try {
+      // TODO: Replace hardcoded account_id with actual account selection
+      // This requires fetching user's accounts and letting them choose
+      // For now, users are auto-created with a default "Cash" account
       await onCreate({
-        account_id: "00000000-0000-0000-0000-000000000000",
+        account_id: "00000000-0000-0000-0000-000000000000", // TEMPORARY: will fail until accounts are properly fetched
         amount,
         type,
         description: description || undefined,

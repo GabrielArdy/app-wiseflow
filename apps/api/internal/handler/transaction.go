@@ -77,8 +77,21 @@ func (h *TransactionHandler) List(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 
+	const (
+		defaultLimit = 50
+		maxLimit     = 500
+	)
+
 	limit, _ := strconv.ParseInt(c.QueryParam("limit"), 10, 32)
+	if limit <= 0 || limit > maxLimit {
+		limit = defaultLimit
+	}
+
 	offset, _ := strconv.ParseInt(c.QueryParam("offset"), 10, 32)
+	if offset < 0 {
+		offset = 0
+	}
+
 	accountID := c.QueryParam("account_id")
 
 	var accountIDPtr *string

@@ -58,9 +58,17 @@ func main() {
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+
+	// Configure CORS based on environment
+	allowedOrigins := []string{"http://localhost:5173"}
+	if cfg.Environment == "production" {
+		allowedOrigins = []string{"https://wiseflow.app"}
+	}
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"*"},
-		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAuthorization},
+		AllowOrigins:     allowedOrigins,
+		AllowHeaders:     []string{echo.HeaderContentType, echo.HeaderAuthorization},
+		AllowMethods:     []string{"GET", "POST", "PATCH", "DELETE"},
+		AllowCredentials: true,
 	}))
 
 	router.Register(e, handlers, cfg.JWTSecret, rdb)

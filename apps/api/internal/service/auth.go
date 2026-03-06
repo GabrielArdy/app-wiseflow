@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
-	dbutil "github.com/wiseflow/api/internal/db"
 	"github.com/wiseflow/api/internal/apperror"
 	"github.com/wiseflow/api/internal/config"
+	dbutil "github.com/wiseflow/api/internal/db"
 	"github.com/wiseflow/api/internal/db/sqlc"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -62,6 +63,23 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*sqlc.Use
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 
+	// Create a default "Cash" account for the new user
+	var balance pgtype.Numeric
+	if err := balance.Scan("0"); err != nil {
+		return nil, fmt.Errorf("initialize balance: %w", err)
+	}
+
+	_, err = s.queries.CreateAccount(ctx, sqlc.CreateAccountParams{
+		UserID:   user.ID,
+		Name:     "Cash",
+		Type:     "cash",
+		Balance:  balance,
+		Currency: "USD",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create default account: %w", err)
+	}
+
 	return &user, nil
 }
 
@@ -75,8 +93,16 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*TokenPair, err
 		return nil, apperror.Unauthorized("INVALID_CREDENTIALS", "Invalid email or password.")
 	}
 
-	sessionToken := randomHex(32)
-	refreshToken := randomHex(32)
+	sessionToken, err := randomHex(32)
+	if err != nil {
+		return nil, fmt.Errorf("generate session token: %w", err)
+	}
+
+	refreshToken, err := randomHex(32)
+	if err != nil {
+		return nil, fmt.Errorf("generate refresh token: %w", err)
+	}
+
 	userID := dbutil.UUIDToString(user.ID)
 
 	accessToken, err := s.generateAccessToken(userID, sessionToken)
@@ -115,8 +141,10 @@ func sessionKey(userID string) string {
 	return fmt.Sprintf("session:%s", userID)
 }
 
-func randomHex(n int) string {
+func randomHex(n int) (string, error) {
 	b := make([]byte, n)
-	rand.Read(b) //nolint:errcheck
-	return hex.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate random bytes: %w", err)
+	}
+	return hex.EncodeToString(b), nil
 }

@@ -1,0 +1,37 @@
+{
+  "review": {
+    "language": "id",
+    "output_format": "json",
+    "checks": {
+      "security": true,
+      "code_quality": true,
+      "naming_convention": true,
+      "dead_code": true,
+      "performance": true,
+      "documentation": false
+    },
+    "severity_threshold": {
+      "block_commit_on": "blocking",
+      "warn_on": "warning"
+    }
+  },
+  "exclude": {
+    "files": [
+      "*.lock",
+      "*.min.js",
+      "*.min.css",
+      "dist/*",
+      "build/*",
+      "node_modules/*",
+      "coverage/*",
+      ".env*",
+      "logs/*"
+    ],
+    "extensions": [".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".pdf"]
+  },
+  "kpi": {
+    "team": "Engineering",
+    "project": "app-wiseflow",
+    "sprint_label": "auto"
+  }
+}

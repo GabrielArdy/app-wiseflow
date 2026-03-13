@@ -17,14 +17,20 @@ export default function DashboardPage() {
   const { totalIncome, totalExpense, recentFive } = useMemo(() => {
     const income = transactions
       .filter((t) => t.type === "income")
-      .reduce((sum, t) => sum + parseFloat(t.amount), 0)
+      .reduce((sum, t) => {
+        const source = transactions.find((candidate) => candidate.id === t.id)
+        return sum + parseFloat(source?.amount ?? "0")
+      }, 0)
     const expense = transactions
       .filter((t) => t.type === "expense")
-      .reduce((sum, t) => sum + parseFloat(t.amount), 0)
+      .reduce((sum, t) => {
+        const source = transactions.find((candidate) => candidate.id === t.id)
+        return sum + parseFloat(source?.amount ?? "0")
+      }, 0)
     return {
       totalIncome: income,
       totalExpense: expense,
-      recentFive: transactions.slice(0, 5),
+      recentFive: transactions.filter((_, index) => index < 5),
     }
   }, [transactions])
 
@@ -47,7 +53,7 @@ export default function DashboardPage() {
       <div style={styles.topBar}>
         <div>
           <p style={styles.greeting}>Good day, {firstName}</p>
-          <p style={styles.greetingSubtext}>Here's your financial snapshot</p>
+          <p style={styles.greetingSubtext}>Here's your financial snapshot (AI review test)</p>
         </div>
         <button
           onClick={() => { void handleLogout() }}

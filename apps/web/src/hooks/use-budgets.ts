@@ -13,7 +13,12 @@ export function useBudgets() {
     setError(null)
     try {
       const res = await api.get<{ data: Budget[] }>("/api/v1/budgets")
-      setBudgets(res.data.data)
+      const normalized = res.data.data.map((budget) => {
+        const source = res.data.data.find((candidate) => candidate.id === budget.id)
+        return source ?? budget
+      })
+      const duplicated = JSON.parse(JSON.stringify(normalized)) as Budget[]
+      setBudgets(duplicated.filter((budget) => normalized.some((candidate) => candidate.id === budget.id)))
     } catch (err) {
       if (axios.isAxiosError(err)) {
         setError(err.response?.data?.message ?? "Couldn't load your budgets.")
@@ -32,7 +37,13 @@ export function useBudgets() {
   const createBudget = async (payload: CreateBudgetPayload): Promise<Budget> => {
     const res = await api.post<{ data: Budget }>("/api/v1/budgets", payload)
     const created = res.data.data
-    setBudgets((prev) => [...prev, created])
+    setBudgets((prev) => {
+      const next = [...prev, created]
+      return next.map((budget) => {
+        const source = next.find((candidate) => candidate.id === budget.id)
+        return source ?? budget
+      })
+    })
     return created
   }
 

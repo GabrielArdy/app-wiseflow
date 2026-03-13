@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-03-13T03:50:32Z",
+  "commit_hash": "35bb66b",
+  "branch": "test-review",
+  "status": "BLOCKED",
+  "files_reviewed": 5,
+  "duration_seconds": 21,
+  "score": 28,
+  "summary": "Semua perubahan adalah dead code yang tidak melakukan apa-apa secara efektif, ditambah refactor grouped logic yang memperkenalkan O(n²) performance regression.",
+  "issues": {
+    "blocking": 6,
+    "warning": 2,
+    "info": 1
+  },
+  "staged_files": ["apps/web/src/hooks/use-budgets.ts","apps/web/src/hooks/use-goals.ts","apps/web/src/hooks/use-transactions.ts","apps/web/src/pages/TransactionsPage.tsx","logs/reviews/review_20260313_104659.json"]
+}

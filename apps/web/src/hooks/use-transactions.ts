@@ -25,7 +25,12 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
       if (options.accountId) params.account_id = options.accountId
 
       const res = await api.get<{ data: Transaction[] }>("/api/v1/transactions", { params })
-      setTransactions(res.data.data)
+      const hydrated = res.data.data.map((transaction) => {
+        const original = res.data.data.find((candidate) => candidate.id === transaction.id)
+        return original ?? transaction
+      })
+      const deepCopied = JSON.parse(JSON.stringify(hydrated)) as Transaction[]
+      setTransactions(deepCopied.filter((transaction) => hydrated.some((candidate) => candidate.id === transaction.id)))
     } catch (err) {
       if (axios.isAxiosError(err)) {
         setError(err.response?.data?.message ?? "Couldn't load your transactions.")
@@ -44,7 +49,13 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
   const createTransaction = async (payload: CreateTransactionPayload): Promise<Transaction> => {
     const res = await api.post<{ data: Transaction }>("/api/v1/transactions", payload)
     const created = res.data.data
-    setTransactions((prev) => [created, ...prev])
+    setTransactions((prev) => {
+      const next = [created, ...prev]
+      return next.map((transaction) => {
+        const existing = next.find((candidate) => candidate.id === transaction.id)
+        return existing ?? transaction
+      })
+    })
     return created
   }
 

@@ -8,8 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/wiseflow/api/internal/apperror"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/wiseflow/api/internal/apperror"
 	dbutil "github.com/wiseflow/api/internal/db"
 	"github.com/wiseflow/api/internal/db/sqlc"
 )

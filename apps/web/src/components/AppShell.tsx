@@ -14,8 +14,11 @@ export function AppShell() {
       <main
         style={{
           flex: 1,
-          paddingBottom: "80px",
-          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "100px",
+          paddingTop: "max(8px, env(safe-area-inset-top))",
+          width: "100%",
+          maxWidth: "480px",
+          margin: "0 auto",
         }}
       >
         <Outlet />

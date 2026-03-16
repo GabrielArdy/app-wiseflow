@@ -1,10 +1,19 @@
-import { useMemo } from "react"
+import { useMemo, type CSSProperties } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowUpRight, ArrowDownRight, TrendingUp, LogOut } from "lucide-react"
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  TrendingUp,
+  LogOut,
+  Wallet,
+  Target,
+  ArrowLeftRight,
+  Sparkles,
+} from "lucide-react"
 import { useAuthStore } from "@/stores/auth-store"
 import { useTransactions } from "@/hooks/use-transactions"
 import { Skeleton } from "@/components/ui/skeleton"
-import { formatCurrency, formatRelativeDate } from "@/lib/utils"
+import { formatCurrency, formatRelativeDate, formatDate } from "@/lib/utils"
 import api from "@/lib/axios"
 import type { Transaction } from "@/types/api"
 
@@ -14,23 +23,34 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const { transactions, loading } = useTransactions({ limit: 10 })
 
-  const { totalIncome, totalExpense, recentFive } = useMemo(() => {
-    const income = transactions
-      .filter((t) => t.type === "income")
-      .reduce((sum, t) => {
-        const source = transactions.find((candidate) => candidate.id === t.id)
-        return sum + parseFloat(source?.amount ?? "0")
-      }, 0)
-    const expense = transactions
-      .filter((t) => t.type === "expense")
-      .reduce((sum, t) => {
-        const source = transactions.find((candidate) => candidate.id === t.id)
-        return sum + parseFloat(source?.amount ?? "0")
-      }, 0)
+  const { totalIncome, totalExpense, recentFive, averageExpense, savingsRate } = useMemo(() => {
+    const totals = transactions.reduce(
+      (accumulator, transaction) => {
+        const amount = Number.parseFloat(transaction.amount)
+        if (transaction.type === "income") {
+          accumulator.income += amount
+        } else {
+          accumulator.expense += amount
+        }
+        return accumulator
+      },
+      { income: 0, expense: 0 }
+    )
+
+    const expenseCount = transactions.filter((transaction) => transaction.type === "expense").length
+    const average = expenseCount > 0 ? totals.expense / expenseCount : 0
+    const rate = totals.income > 0 ? ((totals.income - totals.expense) / totals.income) * 100 : 0
+
+    const sorted = [...transactions].sort((left, right) => {
+      return new Date(right.date).getTime() - new Date(left.date).getTime()
+    })
+
     return {
-      totalIncome: income,
-      totalExpense: expense,
-      recentFive: transactions.filter((_, index) => index < 5),
+      totalIncome: totals.income,
+      totalExpense: totals.expense,
+      recentFive: sorted.slice(0, 5),
+      averageExpense: average,
+      savingsRate: Math.max(0, rate),
     }
   }, [transactions])
 
@@ -46,14 +66,15 @@ export default function DashboardPage() {
   }
 
   const firstName = user?.full_name?.split(" ")[0] ?? "there"
+  const todayLabel = formatDate(new Date().toISOString().slice(0, 10))
+  const monthFlow = totalIncome + totalExpense
 
   return (
     <div className="page-enter" style={styles.page}>
-      {/* Top bar */}
       <div style={styles.topBar}>
         <div>
-          <p style={styles.greeting}>Good day, {firstName}</p>
-          <p style={styles.greetingSubtext}>Here's your financial snapshot (AI review test)</p>
+          <p style={styles.greeting}>Hi {firstName}, keep your money in flow</p>
+          <p style={styles.greetingSubtext}>{todayLabel}</p>
         </div>
         <button
           onClick={() => { void handleLogout() }}
@@ -65,30 +86,32 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* Balance hero card — the unforgettable detail */}
       <div style={styles.heroCard}>
-        <div style={styles.heroTop}>
-          <div style={styles.heroIcon}>
-            <TrendingUp size={18} color="rgba(255,255,255,0.85)" />
+        <div style={styles.heroHeader}>
+          <div style={styles.heroTop}>
+            <div style={styles.heroIcon}>
+              <TrendingUp size={18} color="var(--wf-white)" />
+            </div>
+            <p style={styles.heroLabel}>Flow Balance</p>
           </div>
-          <p style={styles.heroLabel}>Total Balance</p>
+          <div style={styles.heroPill}>
+            <Sparkles size={14} color="var(--wf-white)" />
+            <span style={styles.heroPillText}>Wise snapshot</span>
+          </div>
         </div>
 
         {loading ? (
           <div style={{ marginTop: "8px" }}>
-            <div className="skeleton" style={{ height: "44px", width: "180px", borderRadius: "8px", backgroundColor: "rgba(255,255,255,0.15)", backgroundImage: "none" }} />
+            <div className="skeleton" style={styles.heroBalanceSkeleton} />
           </div>
         ) : (
-          <p
-            key={netBalance}
-            className="count-up tabular-nums"
-            style={styles.heroBalance}
-          >
+          <p key={netBalance} className="count-up tabular-nums" style={styles.heroBalance}>
             {formatCurrency(netBalance)}
           </p>
         )}
 
-        {/* Income / Expense split */}
+        <p style={styles.heroBody}>You have moved {formatCurrency(monthFlow)} this cycle across income and expenses.</p>
+
         <div style={styles.heroSplit}>
           <div style={styles.splitItem}>
             <div style={styles.splitIconGreen}>
@@ -97,9 +120,9 @@ export default function DashboardPage() {
             <div>
               <p style={styles.splitLabel}>Income</p>
               {loading ? (
-                <div className="skeleton" style={{ height: "16px", width: "72px", borderRadius: "4px", backgroundColor: "rgba(255,255,255,0.15)", backgroundImage: "none" }} />
+                <div className="skeleton" style={styles.heroRowSkeleton} />
               ) : (
-                <p style={{ ...styles.splitAmount, color: "#A7F3D0" }}>{formatCurrency(totalIncome)}</p>
+                <p style={{ ...styles.splitAmount, color: "var(--wf-white)" }}>{formatCurrency(totalIncome)}</p>
               )}
             </div>
           </div>
@@ -113,19 +136,57 @@ export default function DashboardPage() {
             <div>
               <p style={styles.splitLabel}>Expenses</p>
               {loading ? (
-                <div className="skeleton" style={{ height: "16px", width: "72px", borderRadius: "4px", backgroundColor: "rgba(255,255,255,0.15)", backgroundImage: "none" }} />
+                <div className="skeleton" style={styles.heroRowSkeleton} />
               ) : (
-                <p style={{ ...styles.splitAmount, color: "#FCA5A5" }}>{formatCurrency(totalExpense)}</p>
+                <p style={{ ...styles.splitAmount, color: "var(--wf-white)" }}>{formatCurrency(totalExpense)}</p>
               )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Recent Activity */}
+      <div style={styles.quickActionRow}>
+        <QuickAction
+          icon={ArrowLeftRight}
+          label="Quick Log"
+          onClick={() => {
+            navigate("/transactions")
+          }}
+        />
+        <QuickAction
+          icon={Wallet}
+          label="Smart Budget"
+          onClick={() => {
+            navigate("/budget")
+          }}
+        />
+        <QuickAction
+          icon={Target}
+          label="WiseGoal"
+          onClick={() => {
+            navigate("/goals")
+          }}
+        />
+      </div>
+
+      <div style={styles.metricGrid}>
+        <MetricCard
+          title="Savings rate"
+          value={loading ? "..." : `${savingsRate.toFixed(1)}%`}
+          hint="How much you keep from your income"
+          positive
+        />
+        <MetricCard
+          title="Avg expense"
+          value={loading ? "..." : formatCurrency(averageExpense)}
+          hint="Average size of each expense"
+          positive={false}
+        />
+      </div>
+
       <div style={styles.section}>
         <div style={styles.sectionHeader}>
-          <p style={styles.sectionTitle}>Recent Activity</p>
+          <p style={styles.sectionTitle}>Recent activity</p>
           <button
             onClick={() => { navigate("/transactions") }}
             style={styles.seeAll}
@@ -151,6 +212,47 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function QuickAction({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: typeof ArrowLeftRight
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button style={styles.quickActionButton} className="pressable" onClick={onClick}>
+      <div style={styles.quickActionIcon}>
+        <Icon size={16} color="var(--wf-primary)" />
+      </div>
+      <span style={styles.quickActionLabel}>{label}</span>
+    </button>
+  )
+}
+
+function MetricCard({
+  title,
+  value,
+  hint,
+  positive,
+}: {
+  title: string
+  value: string
+  hint: string
+  positive: boolean
+}) {
+  return (
+    <div style={styles.metricCard}>
+      <p style={styles.metricTitle}>{title}</p>
+      <p className="tabular-nums" style={{ ...styles.metricValue, color: positive ? "var(--wf-success)" : "var(--wf-neutral-900)" }}>
+        {value}
+      </p>
+      <p style={styles.metricHint}>{hint}</p>
     </div>
   )
 }
@@ -207,18 +309,18 @@ function EmptyTransactions({ onAdd }: { onAdd: () => void }) {
     <div style={styles.emptyState}>
       <p style={styles.emptyTitle}>No transactions yet</p>
       <p style={styles.emptyBody}>
-        Start tracking your spending to get a clear picture of where your money goes.
+        Start tracking your spending and build your Flow Tracker from day one.
       </p>
       <button onClick={onAdd} style={styles.emptyBtn} className="pressable">
-        Log your first expense
+        Start with Quick Log
       </button>
     </div>
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   page: {
-    padding: "0 0 16px",
+    padding: "0 0 20px",
     maxWidth: "480px",
     margin: "0 auto",
   },
@@ -230,15 +332,17 @@ const styles: Record<string, React.CSSProperties> = {
   },
   greeting: {
     fontFamily: "'Plus Jakarta Sans', sans-serif",
-    fontSize: "20px",
+    fontSize: "22px",
     fontWeight: 700,
     color: "var(--wf-neutral-900)",
     margin: 0,
   },
   greetingSubtext: {
-    fontSize: "13px",
+    fontSize: "12px",
     color: "var(--wf-neutral-500)",
-    margin: "2px 0 0",
+    margin: "4px 0 0",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
   },
   logoutBtn: {
     width: "40px",
@@ -261,6 +365,11 @@ const styles: Record<string, React.CSSProperties> = {
     position: "relative",
     overflow: "hidden",
   },
+  heroHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   heroTop: {
     display: "flex",
     alignItems: "center",
@@ -275,21 +384,48 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
   },
+  heroPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "6px 10px",
+    borderRadius: "var(--wf-radius-full)",
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  heroPillText: {
+    color: "var(--wf-white)",
+    fontSize: "11px",
+    fontWeight: 600,
+    margin: 0,
+  },
   heroLabel: {
     fontSize: "13px",
-    color: "rgba(255,255,255,0.75)",
+    color: "rgba(255,255,255,0.86)",
     margin: 0,
     fontWeight: 500,
     letterSpacing: "0.02em",
     textTransform: "uppercase",
+  },
+  heroBalanceSkeleton: {
+    height: "44px",
+    width: "180px",
+    borderRadius: "8px",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundImage: "none",
   },
   heroBalance: {
     fontFamily: "'Plus Jakarta Sans', sans-serif",
     fontSize: "40px",
     fontWeight: 700,
     color: "white",
-    margin: "8px 0 24px",
+    margin: "8px 0 10px",
     letterSpacing: "-0.02em",
+  },
+  heroBody: {
+    margin: "0 0 18px",
+    color: "rgba(255,255,255,0.86)",
+    fontSize: "13px",
+    lineHeight: 1.5,
   },
   heroSplit: {
     display: "flex",
@@ -332,6 +468,13 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: "uppercase",
     letterSpacing: "0.04em",
   },
+  heroRowSkeleton: {
+    height: "16px",
+    width: "72px",
+    borderRadius: "4px",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundImage: "none",
+  },
   splitAmount: {
     fontSize: "15px",
     fontWeight: 600,
@@ -344,8 +487,73 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "0 16px",
     alignSelf: "stretch",
   },
+  quickActionRow: {
+    margin: "14px 16px 0",
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "10px",
+  },
+  quickActionButton: {
+    border: "1px solid var(--wf-neutral-100)",
+    backgroundColor: "var(--wf-white)",
+    borderRadius: "var(--wf-radius-md)",
+    padding: "12px 8px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    minHeight: "78px",
+  },
+  quickActionIcon: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "10px",
+    backgroundColor: "var(--wf-primary-light)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionLabel: {
+    fontSize: "12px",
+    fontWeight: 600,
+    color: "var(--wf-neutral-700)",
+  },
+  metricGrid: {
+    margin: "12px 16px 0",
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "10px",
+  },
+  metricCard: {
+    backgroundColor: "var(--wf-white)",
+    border: "1px solid var(--wf-neutral-100)",
+    borderRadius: "var(--wf-radius-md)",
+    padding: "14px",
+  },
+  metricTitle: {
+    margin: 0,
+    fontSize: "12px",
+    textTransform: "uppercase",
+    letterSpacing: "0.03em",
+    color: "var(--wf-neutral-500)",
+    fontWeight: 600,
+  },
+  metricValue: {
+    margin: "8px 0 4px",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: "22px",
+    fontWeight: 700,
+    lineHeight: 1.2,
+  },
+  metricHint: {
+    margin: 0,
+    fontSize: "12px",
+    color: "var(--wf-neutral-500)",
+    lineHeight: 1.4,
+  },
   section: {
-    margin: "28px 0 0",
+    margin: "24px 0 0",
   },
   sectionHeader: {
     display: "flex",

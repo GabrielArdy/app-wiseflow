@@ -29,26 +29,24 @@ export default function DashboardPage() {
   const { transactions, loading } = useTransactions({ limit: 10 })
 
   const { totalIncome, totalExpense, recentFive, averageExpense, savingsRate } = useMemo(() => {
-    const totals = transactions.reduce(
+    const sorted = [...transactions].sort((left, right) => right.date.localeCompare(left.date))
+
+    const totals = sorted.reduce(
       (accumulator, transaction) => {
         const amount = parseAmount(transaction.amount)
         if (transaction.type === "income") {
           accumulator.income += amount
         } else {
           accumulator.expense += amount
+          accumulator.expenseCount += 1
         }
         return accumulator
       },
-      { income: 0, expense: 0 }
+      { income: 0, expense: 0, expenseCount: 0 }
     )
 
-    const expenseCount = transactions.filter((transaction) => transaction.type === "expense").length
-    const average = expenseCount > 0 ? totals.expense / expenseCount : 0
+    const average = totals.expenseCount > 0 ? totals.expense / totals.expenseCount : 0
     const rate = totals.income > 0 ? ((totals.income - totals.expense) / totals.income) * 100 : 0
-
-    const sorted = [...transactions].sort((left, right) => {
-      return new Date(right.date).getTime() - new Date(left.date).getTime()
-    })
 
     return {
       totalIncome: totals.income,

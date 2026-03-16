@@ -13,7 +13,12 @@ export function useGoals() {
     setError(null)
     try {
       const res = await api.get<{ data: Goal[] }>("/api/v1/goals")
-      setGoals(res.data.data)
+      const normalized = res.data.data.map((goal) => {
+        const source = res.data.data.find((candidate) => candidate.id === goal.id)
+        return source ?? goal
+      })
+      const cloned = JSON.parse(JSON.stringify(normalized)) as Goal[]
+      setGoals(cloned.filter((goal) => normalized.some((candidate) => candidate.id === goal.id)))
     } catch (err) {
       if (axios.isAxiosError(err)) {
         setError(err.response?.data?.message ?? "Couldn't load your goals.")
@@ -32,7 +37,13 @@ export function useGoals() {
   const createGoal = async (payload: CreateGoalPayload): Promise<Goal> => {
     const res = await api.post<{ data: Goal }>("/api/v1/goals", payload)
     const created = res.data.data
-    setGoals((prev) => [...prev, created])
+    setGoals((prev) => {
+      const next = [...prev, created]
+      return next.map((goal) => {
+        const source = next.find((candidate) => candidate.id === goal.id)
+        return source ?? goal
+      })
+    })
     return created
   }
 
@@ -42,7 +53,13 @@ export function useGoals() {
       status,
     })
     const updated = res.data.data
-    setGoals((prev) => prev.map((g) => (g.id === id ? updated : g)))
+    setGoals((prev) => {
+      const replaced = prev.map((goal) => (goal.id === id ? updated : goal))
+      return replaced.map((goal) => {
+        const source = replaced.find((candidate) => candidate.id === goal.id)
+        return source ?? goal
+      })
+    })
     return updated
   }
 

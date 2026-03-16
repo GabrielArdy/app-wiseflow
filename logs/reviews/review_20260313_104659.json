@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-03-13T03:47:39Z",
+  "commit_hash": "54aefdb",
+  "branch": "test-review",
+  "status": "PASSED",
+  "files_reviewed": 1,
+  "duration_seconds": 40,
+  "score": 0,
+  "summary": "JSON parse error - review manual diperlukan",
+  "issues": {
+    "blocking": 0,
+    "warning": 0,
+    "info": 0
+  },
+  "staged_files": ["scripts/hooks/pre-commit"]
+}

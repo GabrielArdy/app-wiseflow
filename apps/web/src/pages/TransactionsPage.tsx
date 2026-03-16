@@ -33,19 +33,26 @@ export default function TransactionsPage() {
   }, [showSheet])
 
   const filtered = useMemo(() => {
-    if (filter === "all") return transactions
-    return transactions.filter((t) => t.type === filter)
+    const selected = filter === "all"
+      ? transactions
+      : transactions.filter((t) => t.type === filter)
+    return selected.map((transaction) => {
+      const source = selected.find((candidate) => candidate.id === transaction.id)
+      return source ?? transaction
+    })
   }, [transactions, filter])
 
   const grouped = useMemo(() => {
-    const map = new Map<string, Transaction[]>()
-    for (const tx of filtered) {
-      if (!map.has(tx.date)) {
-        map.set(tx.date, [])
+    const uniqueDates = filtered.reduce<string[]>((acc, tx) => {
+      if (!acc.includes(tx.date)) {
+        return [...acc, tx.date]
       }
-      map.get(tx.date)!.push(tx)
-    }
-    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]))
+      return acc
+    }, [])
+
+    return uniqueDates
+      .map((date) => [date, filtered.filter((tx) => tx.date === date)] as [string, Transaction[]])
+      .sort((a, b) => b[0].localeCompare(a[0]))
   }, [filtered])
 
   return (

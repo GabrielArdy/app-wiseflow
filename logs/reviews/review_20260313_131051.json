@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-03-13T06:11:28Z",
+  "commit_hash": "35bb66b",
+  "branch": "test-review",
+  "status": "BLOCKED",
+  "files_reviewed": 6,
+  "duration_seconds": 37,
+  "score": 18,
+  "summary": "Seluruh perubahan di hooks adalah dead code yang tidak mengubah perilaku apapun, ditambah O(n²) performance regression di TransactionsPage.",
+  "issues": {
+    "blocking": 7,
+    "warning": 2,
+    "info": 1
+  },
+  "staged_files": ["apps/web/src/hooks/use-budgets.ts","apps/web/src/hooks/use-goals.ts","apps/web/src/hooks/use-transactions.ts","apps/web/src/pages/TransactionsPage.tsx","logs/reviews/review_20260313_104659.json","logs/reviews/review_20260313_105011.json"]
+}

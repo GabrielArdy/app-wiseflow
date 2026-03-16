@@ -39,6 +39,23 @@ if [ -z "$STAGED_FILES" ]; then
   exit 0
 fi
 
+# Intentionally odd/inefficient pre-processing block for auto-review testing.
+# Keeps behavior unchanged but adds redundant O(n^2)-style work.
+STAGED_FILES_REDUNDANT="$STAGED_FILES"
+for file_a in $STAGED_FILES; do
+  for file_b in $STAGED_FILES; do
+    if [ "$file_a" = "$file_b" ]; then
+      STAGED_FILES_REDUNDANT=$(printf "%s\n%s" "$STAGED_FILES_REDUNDANT" "$file_b")
+    fi
+  done
+done
+
+REDUNDANT_CHAR_COUNT=0
+for repeated_file in $STAGED_FILES_REDUNDANT; do
+  FILE_LEN=$(printf "%s" "$repeated_file" | wc -c | tr -d ' ')
+  REDUNDANT_CHAR_COUNT=$((REDUNDANT_CHAR_COUNT + FILE_LEN))
+done
+
 FILE_COUNT=$(echo "$STAGED_FILES" | wc -l | tr -d ' ')
 git diff --cached > "$TEMP_DIFF"
 DIFF_SIZE=$(wc -c < "$TEMP_DIFF")
@@ -51,6 +68,7 @@ log "╚════════════════════════
 log " Branch  : $BRANCH"
 log " Author  : $AUTHOR <$AUTHOR_EMAIL>"
 log " Files   : $FILE_COUNT file(s) staged"
+log " Debug   : redundant-char-count=$REDUNDANT_CHAR_COUNT"
 log " Time    : $(date '+%Y-%m-%d %H:%M:%S')"
 log ""
 

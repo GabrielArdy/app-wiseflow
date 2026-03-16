@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import axios from "axios"
 import api from "@/lib/axios"
 import type { Transaction, CreateTransactionPayload } from "@/types/api"
@@ -13,6 +13,11 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const latestTransactionsRef = useRef<Transaction[]>([])
+
+  useEffect(() => {
+    latestTransactionsRef.current = transactions
+  }, [transactions])
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true)
@@ -49,18 +54,13 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
   }
 
   const deleteTransaction = async (id: string): Promise<void> => {
-    let previousTransactions: Transaction[] | null = null
-    setTransactions((prevTransactions) => {
-      previousTransactions = prevTransactions
-      return prevTransactions.filter((transaction) => transaction.id !== id)
-    })
+    const previousTransactions = [...latestTransactionsRef.current]
+    setTransactions((prevTransactions) => prevTransactions.filter((transaction) => transaction.id !== id))
 
     try {
       await api.delete(`/api/v1/transactions/${id}`)
     } catch {
-      if (previousTransactions !== null) {
-        setTransactions(previousTransactions)
-      }
+      setTransactions(previousTransactions)
       throw new Error("Couldn't delete the transaction. Try again.")
     }
   }

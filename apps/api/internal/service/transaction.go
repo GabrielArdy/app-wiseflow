@@ -2,13 +2,21 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
-	dbutil "github.com/wiseflow/api/internal/db"
 	"github.com/wiseflow/api/internal/apperror"
+	dbutil "github.com/wiseflow/api/internal/db"
 	"github.com/wiseflow/api/internal/db/sqlc"
+)
+
+const (
+	maxRetryAttempts = 3
+	retryBaseDelay   = 60 * time.Millisecond
 )
 
 type TransactionService struct {
@@ -17,6 +25,69 @@ type TransactionService struct {
 
 func NewTransactionService(queries *sqlc.Queries) *TransactionService {
 	return &TransactionService{queries: queries}
+}
+
+func isRetryableDBError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+
+	if pgconn.SafeToRetry(err) {
+		return true
+	}
+
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+
+	if len(pgErr.Code) >= 2 && pgErr.Code[:2] == "08" {
+		return true
+	}
+
+	switch pgErr.Code {
+	case "40001", "40P01", "53300", "57P01", "57P02", "57P03":
+		return true
+	default:
+		return false
+	}
+}
+
+func retryDB(ctx context.Context, operation string, fn func() error) error {
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetryAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		err := fn()
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+		if !isRetryableDBError(err) || attempt == maxRetryAttempts-1 {
+			break
+		}
+
+		delay := retryBaseDelay * time.Duration(attempt+1)
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+
+	return fmt.Errorf("%s: %w", operation, lastErr)
 }
 
 type CreateTransactionInput struct {
@@ -68,9 +139,14 @@ func (s *TransactionService) Create(ctx context.Context, in CreateTransactionInp
 		params.CategoryID = catID
 	}
 
-	tx, err := s.queries.CreateTransaction(ctx, params)
+	var tx sqlc.Transaction
+	err = retryDB(ctx, "create transaction", func() error {
+		var queryErr error
+		tx, queryErr = s.queries.CreateTransaction(ctx, params)
+		return queryErr
+	})
 	if err != nil {
-		return nil, fmt.Errorf("create transaction: %w", err)
+		return nil, err
 	}
 
 	return &tx, nil
@@ -88,7 +164,10 @@ func (s *TransactionService) Get(ctx context.Context, userID, txID string) (*sql
 
 	tx, err := s.queries.GetTransaction(ctx, sqlc.GetTransactionParams{ID: tid, UserID: uid})
 	if err != nil {
-		return nil, apperror.NotFound("TRANSACTION_NOT_FOUND", "Transaction not found.")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperror.NotFound("TRANSACTION_NOT_FOUND", "Transaction not found.")
+		}
+		return nil, fmt.Errorf("get transaction: %w", err)
 	}
 
 	return &tx, nil
@@ -110,20 +189,30 @@ func (s *TransactionService) List(ctx context.Context, in ListTransactionsInput)
 		if err != nil {
 			return nil, apperror.BadRequest("INVALID_INPUT", "Invalid account ID.")
 		}
-		txs, err := s.queries.ListTransactionsByAccount(ctx, sqlc.ListTransactionsByAccountParams{
-			UserID: uid, AccountID: aid, Limit: limit, Offset: in.Offset,
+		var txs []sqlc.Transaction
+		err = retryDB(ctx, "list transactions by account", func() error {
+			var queryErr error
+			txs, queryErr = s.queries.ListTransactionsByAccount(ctx, sqlc.ListTransactionsByAccountParams{
+				UserID: uid, AccountID: aid, Limit: limit, Offset: in.Offset,
+			})
+			return queryErr
 		})
 		if err != nil {
-			return nil, fmt.Errorf("list transactions by account: %w", err)
+			return nil, err
 		}
 		return txs, nil
 	}
 
-	txs, err := s.queries.ListTransactions(ctx, sqlc.ListTransactionsParams{
-		UserID: uid, Limit: limit, Offset: in.Offset,
+	var txs []sqlc.Transaction
+	err = retryDB(ctx, "list transactions", func() error {
+		var queryErr error
+		txs, queryErr = s.queries.ListTransactions(ctx, sqlc.ListTransactionsParams{
+			UserID: uid, Limit: limit, Offset: in.Offset,
+		})
+		return queryErr
 	})
 	if err != nil {
-		return nil, fmt.Errorf("list transactions: %w", err)
+		return nil, err
 	}
 
 	return txs, nil
@@ -139,5 +228,9 @@ func (s *TransactionService) Delete(ctx context.Context, userID, txID string) er
 		return apperror.BadRequest("INVALID_INPUT", "Invalid transaction ID.")
 	}
 
-	return s.queries.DeleteTransaction(ctx, sqlc.DeleteTransactionParams{ID: tid, UserID: uid})
+	err = retryDB(ctx, "delete transaction", func() error {
+		return s.queries.DeleteTransaction(ctx, sqlc.DeleteTransactionParams{ID: tid, UserID: uid})
+	})
+
+	return err
 }

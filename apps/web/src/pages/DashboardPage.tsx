@@ -17,6 +17,11 @@ import { formatCurrency, formatRelativeDate, formatDate } from "@/lib/utils"
 import api from "@/lib/axios"
 import type { Transaction } from "@/types/api"
 
+function parseAmount(value: string): number {
+  const parsed = Number.parseFloat(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const clearAuth = useAuthStore((s) => s.clearAuth)
@@ -26,7 +31,7 @@ export default function DashboardPage() {
   const { totalIncome, totalExpense, recentFive, averageExpense, savingsRate } = useMemo(() => {
     const totals = transactions.reduce(
       (accumulator, transaction) => {
-        const amount = Number.parseFloat(transaction.amount)
+        const amount = parseAmount(transaction.amount)
         if (transaction.type === "income") {
           accumulator.income += amount
         } else {
@@ -77,6 +82,7 @@ export default function DashboardPage() {
           <p style={styles.greetingSubtext}>{todayLabel}</p>
         </div>
         <button
+          type="button"
           onClick={() => { void handleLogout() }}
           style={styles.logoutBtn}
           aria-label="Sign out"
@@ -188,6 +194,7 @@ export default function DashboardPage() {
         <div style={styles.sectionHeader}>
           <p style={styles.sectionTitle}>Recent activity</p>
           <button
+            type="button"
             onClick={() => { navigate("/transactions") }}
             style={styles.seeAll}
             className="pressable"
@@ -226,7 +233,7 @@ function QuickAction({
   onClick: () => void
 }) {
   return (
-    <button style={styles.quickActionButton} className="pressable" onClick={onClick}>
+    <button type="button" style={styles.quickActionButton} className="pressable" onClick={onClick} aria-label={label}>
       <div style={styles.quickActionIcon}>
         <Icon size={16} color="var(--wf-primary)" />
       </div>
@@ -259,7 +266,7 @@ function MetricCard({
 
 function TransactionRow({ tx }: { tx: Transaction }) {
   const isIncome = tx.type === "income"
-  const amount = parseFloat(tx.amount)
+  const amount = parseAmount(tx.amount)
 
   return (
     <div style={styles.txRow} className="pressable">
@@ -311,7 +318,7 @@ function EmptyTransactions({ onAdd }: { onAdd: () => void }) {
       <p style={styles.emptyBody}>
         Start tracking your spending and build your Flow Tracker from day one.
       </p>
-      <button onClick={onAdd} style={styles.emptyBtn} className="pressable">
+      <button type="button" onClick={onAdd} style={styles.emptyBtn} className="pressable">
         Start with Quick Log
       </button>
     </div>

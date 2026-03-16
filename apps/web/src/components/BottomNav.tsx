@@ -12,6 +12,7 @@ const tabs = [
 export function BottomNav() {
   return (
     <nav
+      aria-label="Primary"
       style={{
         position: "fixed",
         bottom: "max(12px, env(safe-area-inset-bottom))",

@@ -36,7 +36,7 @@ export function BottomNav() {
           style={{ flex: 1, textDecoration: "none" }}
           className={({ isActive }) =>
             cn(
-              "relative flex flex-col items-center justify-center min-h-[44px] transition-colors",
+              "relative flex flex-col items-center justify-center min-h-11 transition-colors",
               isActive ? "text-[--wf-primary]" : "text-[--wf-neutral-500]"
             )
           }

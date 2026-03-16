@@ -49,12 +49,16 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
   }
 
   const deleteTransaction = async (id: string): Promise<void> => {
-    const previous = [...transactions]
-    setTransactions((prev) => prev.filter((t) => t.id !== id))
+    let previousTransactions: Transaction[] = []
+    setTransactions((prevTransactions) => {
+      previousTransactions = prevTransactions
+      return prevTransactions.filter((transaction) => transaction.id !== id)
+    })
+
     try {
       await api.delete(`/api/v1/transactions/${id}`)
     } catch {
-      setTransactions(previous)
+      setTransactions(previousTransactions)
       throw new Error("Couldn't delete the transaction. Try again.")
     }
   }

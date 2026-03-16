@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react"
+import { useCallback, useMemo, type CSSProperties } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   ArrowUpRight,
@@ -9,6 +9,7 @@ import {
   Target,
   ArrowLeftRight,
   Sparkles,
+  type LucideIcon,
 } from "lucide-react"
 import { useAuthStore } from "@/stores/auth-store"
 import { useTransactions } from "@/hooks/use-transactions"
@@ -22,40 +23,45 @@ function parseAmount(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+function getDashboardMetrics(transactions: Transaction[]) {
+  const sorted = [...transactions].sort((left, right) => right.date.localeCompare(left.date))
+
+  const totals = sorted.reduce(
+    (accumulator, transaction) => {
+      const amount = parseAmount(transaction.amount)
+      if (transaction.type === "income") {
+        accumulator.income += amount
+      } else {
+        accumulator.expense += amount
+        accumulator.expenseCount += 1
+      }
+      return accumulator
+    },
+    { income: 0, expense: 0, expenseCount: 0 }
+  )
+
+  const averageExpense = totals.expenseCount > 0 ? totals.expense / totals.expenseCount : 0
+  const savingsRate = totals.income > 0 ? ((totals.income - totals.expense) / totals.income) * 100 : 0
+
+  return {
+    totalIncome: totals.income,
+    totalExpense: totals.expense,
+    recentFive: sorted.slice(0, 5),
+    averageExpense,
+    savingsRate: Math.max(0, savingsRate),
+  }
+}
+
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const clearAuth = useAuthStore((s) => s.clearAuth)
   const navigate = useNavigate()
   const { transactions, loading } = useTransactions({ limit: 10 })
 
-  const { totalIncome, totalExpense, recentFive, averageExpense, savingsRate } = useMemo(() => {
-    const sorted = [...transactions].sort((left, right) => right.date.localeCompare(left.date))
-
-    const totals = sorted.reduce(
-      (accumulator, transaction) => {
-        const amount = parseAmount(transaction.amount)
-        if (transaction.type === "income") {
-          accumulator.income += amount
-        } else {
-          accumulator.expense += amount
-          accumulator.expenseCount += 1
-        }
-        return accumulator
-      },
-      { income: 0, expense: 0, expenseCount: 0 }
-    )
-
-    const average = totals.expenseCount > 0 ? totals.expense / totals.expenseCount : 0
-    const rate = totals.income > 0 ? ((totals.income - totals.expense) / totals.income) * 100 : 0
-
-    return {
-      totalIncome: totals.income,
-      totalExpense: totals.expense,
-      recentFive: sorted.slice(0, 5),
-      averageExpense: average,
-      savingsRate: Math.max(0, rate),
-    }
-  }, [transactions])
+  const { totalIncome, totalExpense, recentFive, averageExpense, savingsRate } = useMemo(
+    () => getDashboardMetrics(transactions),
+    [transactions]
+  )
 
   const netBalance = totalIncome - totalExpense
 
@@ -71,6 +77,15 @@ export default function DashboardPage() {
   const firstName = user?.full_name?.split(" ")[0] ?? "there"
   const todayLabel = formatDate(new Date().toISOString().slice(0, 10))
   const monthFlow = totalIncome + totalExpense
+  const goToTransactions = useCallback(() => {
+    navigate("/transactions")
+  }, [navigate])
+  const goToBudget = useCallback(() => {
+    navigate("/budget")
+  }, [navigate])
+  const goToGoals = useCallback(() => {
+    navigate("/goals")
+  }, [navigate])
 
   return (
     <div className="page-enter" style={styles.page}>
@@ -81,7 +96,9 @@ export default function DashboardPage() {
         </div>
         <button
           type="button"
-          onClick={() => { void handleLogout() }}
+          onClick={() => {
+            void handleLogout()
+          }}
           style={styles.logoutBtn}
           aria-label="Sign out"
           className="pressable"
@@ -150,27 +167,9 @@ export default function DashboardPage() {
       </div>
 
       <div style={styles.quickActionRow}>
-        <QuickAction
-          icon={ArrowLeftRight}
-          label="Quick Log"
-          onClick={() => {
-            navigate("/transactions")
-          }}
-        />
-        <QuickAction
-          icon={Wallet}
-          label="Smart Budget"
-          onClick={() => {
-            navigate("/budget")
-          }}
-        />
-        <QuickAction
-          icon={Target}
-          label="WiseGoal"
-          onClick={() => {
-            navigate("/goals")
-          }}
-        />
+        <QuickAction icon={ArrowLeftRight} label="Quick Log" onClick={goToTransactions} />
+        <QuickAction icon={Wallet} label="Smart Budget" onClick={goToBudget} />
+        <QuickAction icon={Target} label="WiseGoal" onClick={goToGoals} />
       </div>
 
       <div style={styles.metricGrid}>
@@ -193,7 +192,7 @@ export default function DashboardPage() {
           <p style={styles.sectionTitle}>Recent activity</p>
           <button
             type="button"
-            onClick={() => { navigate("/transactions") }}
+            onClick={goToTransactions}
             style={styles.seeAll}
             className="pressable"
           >
@@ -208,7 +207,7 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : recentFive.length === 0 ? (
-          <EmptyTransactions onAdd={() => { navigate("/transactions") }} />
+          <EmptyTransactions onAdd={goToTransactions} />
         ) : (
           <div style={styles.transactionList}>
             {recentFive.map((tx) => (
@@ -226,7 +225,7 @@ function QuickAction({
   label,
   onClick,
 }: {
-  icon: typeof ArrowLeftRight
+  icon: LucideIcon
   label: string
   onClick: () => void
 }) {

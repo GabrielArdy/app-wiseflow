@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import axios from "axios"
 import api from "@/lib/axios"
 import type { Transaction, CreateTransactionPayload } from "@/types/api"
@@ -13,11 +13,6 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const latestTransactionsRef = useRef<Transaction[]>([])
-
-  useEffect(() => {
-    latestTransactionsRef.current = transactions
-  }, [transactions])
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true)
@@ -53,8 +48,8 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
     return created
   }
 
-  const deleteTransaction = async (id: string): Promise<void> => {
-    const previousTransactions = [...latestTransactionsRef.current]
+  const deleteTransaction = useCallback(async (id: string): Promise<void> => {
+    const previousTransactions = [...transactions]
     setTransactions((prevTransactions) => prevTransactions.filter((transaction) => transaction.id !== id))
 
     try {
@@ -63,7 +58,7 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
       setTransactions(previousTransactions)
       throw new Error("Couldn't delete the transaction. Try again.")
     }
-  }
+  }, [transactions])
 
   return { transactions, loading, error, refetch: fetchTransactions, createTransaction, deleteTransaction }
 }
